@@ -1,0 +1,14 @@
+[project]
+name = "Coro-bot"
+description = "General Utility Bot for Corobo Cult"
+readme = "README.md"
+license = "MIT" 
+requires-python = ">=3.13"
+dependencies = [
+  "discord.py==2.7.1",
+  "pysqlite3==0.6.0",
+  "sqlparse==0.5.5"
+]
+
+[tool.poetry]
+package-mode = false
