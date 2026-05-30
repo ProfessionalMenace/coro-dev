@@ -11,15 +11,16 @@ from sql import Database
 
 #start error logging
 tracemalloc.start()
-config = open("./config/config.json", "r")
-config_data = json.loads(config.read())
-config.close()
 
-TOKEN = json.loads(open("./config/secrets.json", "r").read())["BOT TOKEN"]
-BOT_COLOR = config_data["BOT COLOR"]
-SERVER_ID = int(config_data["SERVER ID"])
+with open("./config/config.json", "r") as config:
+	config_data = json.loads(config.read())
+	BOT_COLOR = config_data["BOT COLOR"]
+	SERVER_ID = config_data["SERVER ID"]
+  SERVER_ID = int(config_data["SERVER ID"])
+  MOD_ROLE_ID = int(config_data["MOD ROLE ID"])
 
-MOD_ROLE_ID = int(config_data["MOD ROLE ID"])
+with open("./config/secrets.json", "r") as secrets:
+	TOKEN = json.loads(secrets.read())["BOT TOKEN"]
 
 confessions = Database("config/confessions.db")
 
@@ -138,5 +139,5 @@ async def command_autocomplete_view_macros(interaction: discord.Interaction, cur
 																		WHERE name LIKE ?;
 				 ''')]
 
-
-bot.run(TOKEN)
+if __name__ == "__main__":
+	bot.run(TOKEN)
