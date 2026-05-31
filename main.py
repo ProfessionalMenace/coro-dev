@@ -110,12 +110,11 @@ async def confessions_database__add_macro (interaction: discord.Interaction, nam
 	await interaction.followup.send("Macro successfully created!")
 @confessions_database__add_macro.error
 async def confessions_database__add_macro__error (interaction: discord.Interaction, error: Exception):
-	try:
-		if isinstance(error, app_commands.MissingAnyRole):
-			return await interaction.response.send_message("Insuffcient Permissions")
-		await interaction.followup.send("Command failed with the following message: " + str(error))
-	except Exception as e:
-		await interaction.response.send_message("Command failed with the following message: " + str(error) + "\n-# Additionally, a second error was found when producing this message: " + str(e), ephemeral=True)
+	if isinstance(error, app_commands.MissingRole):
+		return await interaction.response.send_message("Insufficient Permissions", ephemeral=True)
+	if interaction.response.is_done():
+		return await interaction.followup.send("Command failed with the following message: " + str(error))
+	await interaction.response.send_message("Command failed with the following message: " + str(error), ephemeral=True)
 
 
 @confessions_database_group.command(name = "view-macro", description="View all macros, or get data on a specific one")
@@ -141,12 +140,11 @@ async def command_autocomplete_view_macros(interaction: discord.Interaction, cur
 				 for value in confessions_macro_manager.get_macros() if current in value["name"]][:25]
 @confessions_database__view_macros.error
 async def confessions_database__view_macros__error (interaction: discord.Interaction, error: Exception):
-	try:
-		if isinstance(error, app_commands.MissingAnyRole):
-			return await interaction.response.send_message("Insuffcient Permissions")
-		await interaction.followup.send("Command failed with the following message: " + str(error))
-	except Exception as e:
-		await interaction.response.send_message("Command failed with the following message: " + str(error) + "\n-# Additionally, a second error was found when producing this message: " + str(e), ephemeral=True)
+	if isinstance(error, app_commands.MissingRole):
+		return await interaction.response.send_message("insufficient Permissions", ephemeral=True)
+	if interaction.response.is_done():
+		return await interaction.followup.send("Command failed with the following message: " + str(error))
+	await interaction.response.send_message("Command failed with the following message: " + str(error), ephemeral=True)
 
 if __name__ == "__main__":
 	bot.run(TOKEN)
