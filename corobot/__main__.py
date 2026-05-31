@@ -12,14 +12,7 @@ import sql
 #start error logging
 tracemalloc.start()
 
-with open("./config/config.json", "r") as config:
-	config_data = json.load(config)
-	BOT_COLOR = config_data["BOT COLOR"]
-	SERVER_ID = int(config_data["SERVER ID"])
-	MOD_ROLE_ID = int(config_data["MOD ROLE ID"])
-
-with open("./config/secrets.json", "r") as secrets:
-	TOKEN = json.load(secrets)["BOT TOKEN"]
+from config import *
 
 confessions = sql.Database("data/confessions.db")
 confessions_macro_manager = sql.MacroManager("data/sql_macros.json", confessions)
