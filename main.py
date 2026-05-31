@@ -95,7 +95,7 @@ async def command_autocomplete(interaction: discord.Interaction, current: str) -
 confessions_group = app_commands.Group(name="confessions", description="Anonymous Confession Commands", guild_ids=[SERVER_ID])
 bot.tree.add_command(confessions_group)
 
-confessions_database_group = app_commands.Group(name="database", description="Access and Mofidy Confession Database", guild_ids=[SERVER_ID])
+confessions_database_group = app_commands.Group(name="database", description="Access and Modify Confession Database", guild_ids=[SERVER_ID])
 confessions_group.add_command(confessions_database_group)
 
 @confessions_database_group.command(name = "create-macro", description="Create a new macro")

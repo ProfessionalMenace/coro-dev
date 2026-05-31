@@ -10,9 +10,10 @@ from collections.abc import Iterable
 import json
 
 type QueryReturn = typing.Union[typing.Generator[sqlite3.Row], typing.Optional[sqlite3.Row]]
+type DiscordUserId = int
 class MacroData(typing.TypedDict):
 	name: str
-	author_id: typing.ReadOnly[int]
+	author_id: typing.ReadOnly[DiscordUserId]
 	code: str
 	query: bool
 
@@ -62,7 +63,7 @@ class Database:
 		else: self.execute(query=query)
 		if size == 1: return self.cursor.fetchone()
 		i = 0
-		while size == -1 or i < size:
+		while size and (size == -1 or i < size):
 			ret = self.cursor.fetchone()
 			if ret is None:
 				break
@@ -82,7 +83,7 @@ class MacroManager:
 		with open(self.path, "w") as macros:
 			json.dump(self.macros, macros, indent=2)
 	
-	def create_macro (self, /, name: str, author_id: int, code: str):
+	def create_macro (self, /, name: str, author_id: DiscordUserId, code: str):
 		'''create a new macro'''
 		if name in self.macros:
 			raise ValueError(f"Macro '{name}' already exists")
@@ -95,6 +96,9 @@ class MacroManager:
 			"query": code.index("SELECT") == 0
 		}
 		self.save()
+	
+	def edit_macro (self, /, name: str, editor: DiscordUserId, new_name: typing.Optional[str], new_code: typing.Optional[str], bypass_checks: bool = False):
+		
 	
 	def get_macros (self) -> typing.Generator[MacroData]:
 		for name in self.macros:
