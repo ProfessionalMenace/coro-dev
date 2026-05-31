@@ -85,7 +85,7 @@ class MacroManager:
 	def create_macro (self, /, name: str, author_id: int, code: str):
 		'''create a new macro'''
 		if name in self.macros:
-			raise ValueError(f"Macro {name} already exists")
+			raise ValueError(f"Macro '{name}' already exists")
 		code = code.strip()
 		print(code)
 		self.macros[name] = {
