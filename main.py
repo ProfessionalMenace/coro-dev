@@ -121,7 +121,6 @@ async def confessions_database__add_macro__error (interaction: discord.Interacti
 @app_commands.checks.has_role(MOD_ROLE_ID)
 @app_commands.describe(name = "Get info on a specific macro")
 async def confessions_database__view_macros (interaction: discord.Interaction, name: typing.Optional[str] = None):
-	await interaction.response.defer(ephemeral=True)
 	if name is None:
 		output = []
 		for row in confessions_macro_manager.get_macros():
@@ -141,7 +140,7 @@ async def command_autocomplete_view_macros(interaction: discord.Interaction, cur
 @confessions_database__view_macros.error
 async def confessions_database__view_macros__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
-		return await interaction.response.send_message("insufficient Permissions", ephemeral=True)
+		return await interaction.response.send_message("Insufficient Permissions", ephemeral=True)
 	if interaction.response.is_done():
 		return await interaction.followup.send("Command failed with the following message: " + str(error))
 	await interaction.response.send_message("Command failed with the following message: " + str(error), ephemeral=True)
