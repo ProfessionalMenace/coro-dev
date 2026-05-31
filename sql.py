@@ -75,7 +75,7 @@ class MacroManager:
 		self.path = path
 		self.database = database
 		with open(self.path, "r") as macros:
-			self.macros = json.load(macros)
+			self.macros: typing.Dict[str, MacroData] = json.load(macros)
 	
 	def save (self):
 		'''update the json file'''
@@ -98,7 +98,19 @@ class MacroManager:
 		self.save()
 	
 	def edit_macro (self, /, name: str, editor: DiscordUserId, new_name: typing.Optional[str], new_code: typing.Optional[str], bypass_checks: bool = False):
-		
+		if name not in self.macros:
+			raise ValueError(f"Macro '{name}' not found")
+		if new_name in self.macros:
+			raise ValueError(f"Macro '{new_name}' already in use")
+		if editor != self.macros[name]["author_id"] and not bypass_checks:
+			raise PermissionError("Only the creator may edit this macro")
+		self.macros[name]["name"] = new_name or self.macros[name]["name"]
+		if new_code:
+			new_code = new_code.strip()
+			self.macros[name]["code"] = new_code
+			self.macros[name]["query"] = code.index("SELECT") == 0
+		self.save()
+
 	
 	def get_macros (self) -> typing.Generator[MacroData]:
 		for name in self.macros:
