@@ -7,22 +7,22 @@ import asyncio
 import tracemalloc
 import json
 
-from sql import Database
+from sql import Database, MacroManager
 
 #start error logging
 tracemalloc.start()
 
 with open("./config/config.json", "r") as config:
-	config_data = json.loads(config.read())
+	config_data = json.load(config)
 	BOT_COLOR = config_data["BOT COLOR"]
-	SERVER_ID = config_data["SERVER ID"]
-  SERVER_ID = int(config_data["SERVER ID"])
-  MOD_ROLE_ID = int(config_data["MOD ROLE ID"])
+	SERVER_ID = int(config_data["SERVER ID"])
+	MOD_ROLE_ID = int(config_data["MOD ROLE ID"])
 
 with open("./config/secrets.json", "r") as secrets:
-	TOKEN = json.loads(secrets.read())["BOT TOKEN"]
+	TOKEN = json.load(secrets)["BOT TOKEN"]
 
-confessions = Database("config/confessions.db")
+confessions = Database("data/confessions.db")
+confessions_macro_manager = MacroManager("data/sql_macros.json", confessions)
 
 guild = discord.Object(id=SERVER_ID)
 class MyClient(discord.Client):
@@ -106,12 +106,15 @@ confessions_group.add_command(confessions_database_group)
 )
 async def confessions_database__add_macro (interaction: discord.Interaction, name: str, code: str):
 	await interaction.response.defer(ephemeral=True)
-	if len(name) >= 20:
-		return await interaction.followup.send("Name must be at most 20 characters")
-	if confessions.query(size = 1, query = "SELECT name FROM macros WHERE name = ?;", parameters = (name,)):
-		return await interaction.followup.send("Name is already in use")
-	confessions.create_macro(name = name, author_id = interaction.user.id, code = code)
+	confessions_macro_manager.create_macro(name = name, author_id = interaction.user.id, code = code)
 	await interaction.followup.send("Macro successfully created!")
+@confessions_database__add_macro.error
+async def confessions_database__add_macro__error (interaction: discord.Interaction, error: Exception):
+	try:
+		await interaction.followup.send("Command failed with the following message: " + str(error))
+	except Exception as e:
+		await interaction.response.send_message("Command failed with the following message: " + str(error) + "\n-# Additionally, a second error was found when producing this message: " + str(e), ephemeral=True)
+
 
 @confessions_database_group.command(name = "view-macro", description="View all macros, or get data on a specific one")
 @app_commands.checks.has_role(MOD_ROLE_ID)
@@ -120,8 +123,8 @@ async def confessions_database__view_macros (interaction: discord.Interaction, n
 	await interaction.response.defer(ephemeral=True)
 	if name is None:
 		output = []
-		for row in confessions.query(query = 'SELECT name, author_id FROM macros;'): # pyright: ignore[reportOptionalIterable]
-			output.append(f"`{row["name"]:>20}` - <@{row["author_id"]}>")
+		for row in confessions_macro_manager.get_macros():
+			output.append(f"`{row["name"]}` - <@{row["author_id"]}>")
 		embed = discord.Embed(
 			title="Macros: " + ("all" if name is None else name),
 			description="\n".join(output),
@@ -133,11 +136,7 @@ async def confessions_database__view_macros (interaction: discord.Interaction, n
 @confessions_database__view_macros.autocomplete('name')
 async def command_autocomplete_view_macros(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
 	return [app_commands.Choice(name = value["name"], value = value["name"])
-				 for value in confessions.query(parameters = (f"%{current}%",), size = 25, query = '''
-																		SELECT name
-																		FROM macros
-																		WHERE name LIKE ?;
-				 ''')]
+				 for value in confessions_macro_manager.get_macros() if current in value["name"]][:25]
 
 if __name__ == "__main__":
 	bot.run(TOKEN)
