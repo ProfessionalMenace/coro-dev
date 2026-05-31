@@ -7,7 +7,7 @@ import asyncio
 import tracemalloc
 import json
 
-from sql import Database, MacroManager
+import sql
 
 #start error logging
 tracemalloc.start()
@@ -21,8 +21,8 @@ with open("./config/config.json", "r") as config:
 with open("./config/secrets.json", "r") as secrets:
 	TOKEN = json.load(secrets)["BOT TOKEN"]
 
-confessions = Database("data/confessions.db")
-confessions_macro_manager = MacroManager("data/sql_macros.json", confessions)
+confessions = sql.Database("data/confessions.db")
+confessions_macro_manager = sql.MacroManager("data/sql_macros.json", confessions)
 
 guild = discord.Object(id=SERVER_ID)
 class MyClient(discord.Client):
@@ -111,10 +111,10 @@ async def confessions_database__add_macro (interaction: discord.Interaction, nam
 @confessions_database__add_macro.error
 async def confessions_database__add_macro__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
-		return await interaction.response.send_message("Insufficient Permissions", ephemeral=True)
-	if interaction.response.is_done():
-		return await interaction.followup.send("Command failed with the following message: " + str(error))
-	await interaction.response.send_message("Command failed with the following message: " + str(error), ephemeral=True)
+		return await interaction.response.send_message(f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	if isinstance(error, sql.MacroInUse):
+		return await interaction.response.send_message("Macro is already in use", ephemeral=True)
+	await interaction.response.send_message("Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
 
 @confessions_database_group.command(name = "view-macro", description="View all macros, or get data on a specific one")
@@ -140,10 +140,30 @@ async def command_autocomplete_view_macros(interaction: discord.Interaction, cur
 @confessions_database__view_macros.error
 async def confessions_database__view_macros__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
-		return await interaction.response.send_message("Insufficient Permissions", ephemeral=True)
-	if interaction.response.is_done():
-		return await interaction.followup.send("Command failed with the following message: " + str(error))
-	await interaction.response.send_message("Command failed with the following message: " + str(error), ephemeral=True)
+		return await interaction.response.send_message(f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	await interaction.response.send_message("Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+
+@confessions_database_group.command(name = "edit-macro", description="Edit a macro you've created")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.rename(new_name = "new-name", new_code = "new-code")
+@app_commands.describe(
+	new_name = "Rename the Macro",
+	new_code = "Change the Code"
+)
+async def confessions_database__edit_macro(interaction: discord.Interaction, name: str, new_name: typing.Optional[str] = None, new_code: typing.Optional[str] = None):
+	await interaction.response.defer(ephemeral=True)
+	await interaction.followup.send("under construction sorry")
+@confessions_database__edit_macro.error
+async def confessions_database__edit_macro__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await interaction.response.send_message(f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	if isinstance(error, sql.MacroInUse):
+		return await interaction.response.send_message("Macro is already in use", ephemeral=True)
+	if isinstance(error, sql.MacroNotFound):
+		return await interaction.response.send_message("Macro not found", ephemeral=True)
+	if isinstance(error, sql.InsufficientPermissions):
+		return await interaction.response.send_message("Only the creator of the macro may edit it", ephemeral=True)
+	await interaction.response.send_message("Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
 if __name__ == "__main__":
 	bot.run(TOKEN)
