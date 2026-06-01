@@ -8,6 +8,7 @@ import confessions
 from config import (
 	SERVER_ID, # pyright: ignore[reportAttributeAccessIssue]
 	BOT_COLOR, # pyright: ignore[reportAttributeAccessIssue]
+	CURRENT_HOST, # pyright: ignore[reportAttributeAccessIssue]
 )
 
 guild = discord.Object(id=SERVER_ID)
@@ -29,6 +30,10 @@ async def on_ready():
 	for guild in bot.guilds:
 		if guild.id == SERVER_ID:
 			bot.CoroboCult = guild
+
+	# set status
+	activity = discord.CustomActivity("Under Development | Currently Being Hosted By " + CURRENT_HOST)
+	await bot.change_presence(activity = activity, status = discord.Status.idle)
 
 @bot.tree.command(name="help", description="Get a list of commands or info on a single command")
 @app_commands.rename(cmd="command")

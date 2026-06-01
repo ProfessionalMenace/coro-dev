@@ -7,12 +7,34 @@ Utility file for manipulating and accessing the database
 import typing
 import sqlite3
 import json
-from discord import Interaction # purely for type hints
+from discord import Interaction
 import re
+from collections import defaultdict
 
 import util
 
-type QueryReturn = typing.Union[typing.Generator[sqlite3.Row], typing.Optional[sqlite3.Row]]
+def rows_to_discord (rows: typing.Sequence[sqlite3.Row]) -> str:
+	'''Converts a sequence of rows into formatted text for discord'''
+	out = "```\n"
+	categories = defaultdict(int)
+	for row in rows:
+		for key in row.keys():
+			categories[key] = max(categories[key], len(str(row[key])), len(key))
+	for category in categories:
+		out += (" {:<" + str(categories[category]) + "} |").format(category)
+	out = out[:-2] + "\n"
+	out += "-" * (len(out) - 5)
+	for row in rows:
+		out += "\n"
+		for key in row.keys():
+			print(" {:<" + str(categories[key]) + "} |")
+			out += (" {:<" + str(categories[key]) + "} |").format(row[key])
+		out = out[:-2]
+	out += "\n```"
+	return out
+
+
+type QueryReturn = typing.Generator[sqlite3.Row]
 type DiscordUserId = int
 class MacroData(typing.TypedDict):
 	name: str
@@ -27,6 +49,7 @@ class Database:
 		self.path = path
 		self.connection = sqlite3.connect(self.path)
 		self.cursor = self.connection.cursor()
+		self.cursor.row_factory = sqlite3.Row
 		self.cursor.execute('''CREATE TABLE IF NOT EXISTS confessions (
 											id INT PRIMARY_KEY,
 											author_id INTEGER,
@@ -38,17 +61,12 @@ class Database:
 		self.connection.close()
 		self.connection = sqlite3.connect(self.path)
 		self.cursor = self.connection.cursor()
+		self.cursor.row_factory = sqlite3.Row
 	
 	def execute (self, *parameters: typing.Dict[str, typing.Any], query: str):
 		if len(parameters) > 1 and parameters[0] is not None: self.cursor.executemany(query, parameters)
 		else: self.cursor.execute(query, parameters)
-
-	@typing.overload
-	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Literal[1] = 1) -> typing.Optional[sqlite3.Row]: ... # pyright: ignore[reportOverlappingOverload]
-
-	@typing.overload
-	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> typing.Generator[sqlite3.Row]: ...
-
+	
 	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> QueryReturn:
 		'''
 		Creates and returns the results of a query
@@ -59,7 +77,6 @@ class Database:
 		'''
 		if parameters: self.execute(parameters, query=query)
 		else: self.execute(query=query)
-		if size == 1: return self.cursor.fetchone()
 		i = 0
 		while size and (size == -1 or i < size):
 			ret = self.cursor.fetchone()
@@ -174,8 +191,6 @@ if __name__ == "__main__":
 						has_params = True
 						parameters[match.group(1)] = input(f"Parameter {match.group(1)} > ")
 					ret = confessions.query(query = sql, size = size, parameters=parameters if has_params else None)
-					if size == 1:
-						ret = [ret]
 					for row in ret:
 						print(row)
 					

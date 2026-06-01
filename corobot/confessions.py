@@ -111,3 +111,30 @@ async def confessions_database__edit_macro__error (interaction: discord.Interact
 	if isinstance(error, sql.MacroError):
 		return await error.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+
+@confessions_database_group.command(name = "query", description="Query the database")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.describe(
+	query = "SQL query to request",
+	select = "Whether or not this query is a select query",
+	size = "How many rows to return, only does something if select is True. Leave blank for all",
+	parameters = "Ignore this, used for macros"
+)
+async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1, parameters: typing.Optional[str] = None):
+	await interaction.response.defer()
+	query = query.strip()
+	if not select:
+		confessions.execute(query = query)
+		await interaction.followup.send("Database Updated")
+	else:
+		if isinstance(parameters, str): parameters = None
+		await util.paginator(
+			interaction = interaction,
+			title = "Query Results",
+			followup=True,
+			iterator = confessions.query(query = query, size = size, parameters = parameters), # pyright: ignore[reportCallIssue, reportArgumentType]
+			known_size = size if size != -1 else None,
+			text = sql.rows_to_discord,
+			items_per_page = 1
+		)
+
