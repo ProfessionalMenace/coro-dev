@@ -56,7 +56,7 @@ async def confessions_database__view_macros (interaction: discord.Interaction, n
 			description = output,
 			color=int(BOT_COLOR, 16)
 		).set_footer(text = f"Made by CoroboCult Mod Team", icon_url = interaction.client.user.avatar.url) # pyright: ignore[reportOptionalMemberAccess]
-		await interaction.followup.send(embed = embed)
+		await interaction.response.send_message(embed = embed)
 	else:
 		pass
 
