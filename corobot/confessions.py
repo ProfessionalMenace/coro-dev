@@ -17,6 +17,7 @@ confessions_macro_manager = sql.MacroManager("data/sql_macros.json")
 @tasks.loop(minutes=5)
 async def check_to_do():
 	confessions.save()
+	#TODO: create a backup every 6 hours, max 4
 
 confessions_group = app_commands.Group(
   name="confessions",
