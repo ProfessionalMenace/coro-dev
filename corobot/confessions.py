@@ -135,6 +135,6 @@ async def confessions_database__query (interaction: discord.Interaction, query: 
 			iterator = confessions.query(query = query, size = size, parameters = parameters), # pyright: ignore[reportCallIssue, reportArgumentType]
 			known_size = size if size != -1 else None,
 			text = sql.rows_to_discord,
-			items_per_page = 1
+			items_per_page = 25
 		)
 
