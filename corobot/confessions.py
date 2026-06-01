@@ -118,23 +118,94 @@ async def confessions_database__edit_macro__error (interaction: discord.Interact
 	query = "SQL query to request",
 	select = "Whether or not this query is a select query",
 	size = "How many rows to return, only does something if select is True. Leave blank for all",
-	parameters = "Ignore this, used for macros"
 )
-async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1, parameters: typing.Optional[str] = None):
+async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1):
 	await interaction.response.defer()
 	query = query.strip()
 	if not select:
 		confessions.execute(query = query)
 		await interaction.followup.send("Database Updated")
 	else:
-		if isinstance(parameters, str): parameters = None
 		await util.paginator(
 			interaction = interaction,
 			title = "Query Results",
 			followup=True,
-			iterator = confessions.query(query = query, size = size, parameters = parameters), # pyright: ignore[reportCallIssue, reportArgumentType]
+			iterator = confessions.query(query = query, size = size), # pyright: ignore[reportCallIssue, reportArgumentType]
 			known_size = size if size != -1 else None,
 			text = sql.rows_to_discord,
 			items_per_page = 25
 		)
+	
+@confessions_database__query.error
+async def confessions_database__query__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
+class ParametersModal (discord.ui.Modal, title = "Parameters"):
+	def __init__ (self, select: bool, code: str, size: int, parameters: typing.Sequence[str]):
+		super().__init__()
+		self.select = select
+		self.code = code
+		self.size = size
+		for parameter in parameters:
+			self.add_item(discord.ui.TextInput(label = parameter, custom_id = parameter))
+	
+	async def on_submit(self, interaction: discord.Interaction) -> None:
+		parameters = {child.custom_id: child.value for child in self.walk_children()} # pyright: ignore[reportAttributeAccessIssue]
+		if not self.select:
+			confessions.execute(parameters, query = self.code)
+			await interaction.response.send_message("Database Updated")
+		else:
+			await util.paginator(
+				interaction = interaction,
+				title = "Query Results",
+				iterator = confessions.query(query = self.code, size = self.size, parameters=parameters), # pyright: ignore[reportCallIssue, reportArgumentType]
+				known_size = self.size if self.size != -1 else None,
+				text = sql.rows_to_discord,
+				items_per_page = 25
+			)
+	
+async def on_error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, sql.MacroError):
+		return await error.send_error_message(interaction, ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+
+
+@confessions_database_group.command(name = "use-macro", description="Use a macro")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.describe(
+	macro = "The macro to use",
+	select = "Whether or not this query is a select query",
+	size = "How many rows to return, only does something if select is True. Leave blank for all",
+)
+async def confessions_database__use_macro (interaction: discord.Interaction, macro: str, select: bool = False, size: int = -1):
+	data = confessions_macro_manager.get_macro(macro)
+
+	if data["parameters"]:
+		await interaction.response.send_modal(ParametersModal(select, data["code"], size, data["parameters"]))
+	else:
+		if not select:
+			confessions.execute(query = data["code"])
+			await interaction.followup.send("Database Updated")
+		else:
+			await util.paginator(
+				interaction = interaction,
+				title = "Query Results",
+				followup=True,
+				iterator = confessions.query(query = data["code"], size = size), # pyright: ignore[reportCallIssue, reportArgumentType]
+				known_size = size if size != -1 else None,
+				text = sql.rows_to_discord,
+				items_per_page = 25
+			)
+@confessions_database__use_macro.error
+async def confessions_database__use_macro__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	if isinstance(error, sql.MacroError):
+		return await error.send_error_message(interaction, ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+@confessions_database__use_macro.autocomplete('macro')
+async def command_autocomplete_use_macro(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
+	return [app_commands.Choice(name = value["name"], value = value["name"])
+		for value in confessions_macro_manager.get_macros() if current in value["name"]][:25]

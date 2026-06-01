@@ -1,28 +1,6 @@
 {
-  "test": {
-    "name": "test",
-    "author_id": 795880771218309131,
-    "code": "SELECT * FROM confessions",
-    "query": true
-  },
-  "test2": {
-    "name": "test2",
-    "author_id": 0,
-    "code": "SELECT * FROM confessions",
-    "query": true,
-    "parameters": []
-  },
-  "test3": {
-    "name": "test3",
-    "author_id": 0,
-    "code": "SELECT * FROM confessions WHERE id = :CNUM",
-    "query": true,
-    "parameters": [
-      ":CNUM"
-    ]
-  },
-  "test4": {
-    "name": "test4",
+  "fetch_id": {
+    "name": "fetch_id",
     "author_id": 0,
     "code": "SELECT * FROM confessions WHERE id = :CNUM",
     "query": true,

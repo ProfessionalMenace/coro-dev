@@ -65,7 +65,7 @@ class Database:
 	
 	def execute (self, *parameters: typing.Dict[str, typing.Any], query: str):
 		if len(parameters) > 1 and parameters[0] is not None: self.cursor.executemany(query, parameters)
-		else: self.cursor.execute(query, parameters)
+		else: self.cursor.execute(query, *parameters)
 	
 	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> QueryReturn:
 		'''
