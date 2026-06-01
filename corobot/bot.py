@@ -3,8 +3,12 @@ from discord.ext import commands, tasks
 from discord.flags import Intents
 from discord import app_commands
 import typing
-from config import *
-from confessions import confessions_group
+
+import confessions
+from config import (
+	SERVER_ID, # pyright: ignore[reportAttributeAccessIssue]
+	BOT_COLOR, # pyright: ignore[reportAttributeAccessIssue]
+)
 
 guild = discord.Object(id=SERVER_ID)
 class MyClient(discord.Client):
@@ -18,7 +22,6 @@ class MyClient(discord.Client):
 
 intents = Intents.all()
 bot = MyClient(intents=intents)
-bot.tree.add_command(confessions_group)
 
 @bot.event
 async def on_ready():
@@ -61,7 +64,6 @@ async def _help(interaction: discord.Interaction, cmd: typing.Optional[str] = No
 		color=int(BOT_COLOR, 16)
 	).set_footer(text = f"Made by CoroboCult Mod Team", icon_url = interaction.client.user.avatar.url) # pyright: ignore[reportOptionalMemberAccess]
 	await interaction.response.send_message(embed=embed)
-
 @_help.autocomplete('cmd')
 async def command_autocomplete(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
 	return [
@@ -71,3 +73,5 @@ async def command_autocomplete(interaction: discord.Interaction, current: str) -
 		app_commands.Choice(name=command.qualified_name, value=command.qualified_name)
 		for command in bot.tree.walk_commands(guild=interaction.guild)
 	][:25]
+
+bot.tree.add_command(confessions.confessions_group)

@@ -6,8 +6,11 @@ Utility file for manipulating and accessing the database
 
 import typing
 import sqlite3
-from collections.abc import Iterable
 import json
+from discord import Interaction # purely for type hints
+import re
+
+import util
 
 type QueryReturn = typing.Union[typing.Generator[sqlite3.Row], typing.Optional[sqlite3.Row]]
 type DiscordUserId = int
@@ -16,6 +19,7 @@ class MacroData(typing.TypedDict):
 	author_id: typing.ReadOnly[DiscordUserId]
 	code: str
 	query: bool
+	parameters: typing.Optional[typing.Sequence[str]]
 
 class Database:
 
@@ -23,17 +27,11 @@ class Database:
 		self.path = path
 		self.connection = sqlite3.connect(self.path)
 		self.cursor = self.connection.cursor()
-		self.cursor.execute('''CREATE TABLE IF NOT EXISTS macros (
-											name TEXT PRIMARY_KEY,
-											author_id INTEGER,
-											code TEXT,
-											query BOOLEAN
-		);''')
 		self.cursor.execute('''CREATE TABLE IF NOT EXISTS confessions (
 											id INT PRIMARY_KEY
 											author_id INTEGER,
 											message_id INTEGER
-		);''')
+		);''') # I feel like i'm missing a key here but I can't remember what it is
 	
 	def save (self):
 		self.connection.commit()
@@ -41,17 +39,17 @@ class Database:
 		self.connection = sqlite3.connect(self.path)
 		self.cursor = self.connection.cursor()
 	
-	def execute (self, *parameters: typing.Any, query: str):
+	def execute (self, *parameters: typing.Dict[str, typing.Any], query: str):
 		if len(parameters) > 1 and parameters[0] is not None: self.cursor.executemany(query, parameters)
 		else: self.cursor.execute(query, parameters)
 
 	@typing.overload
-	def query (self, /, query: str, parameters: typing.Any = None, size: typing.Literal[1] = 1) -> typing.Optional[sqlite3.Row]: ... # pyright: ignore[reportOverlappingOverload]
+	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Literal[1] = 1) -> typing.Optional[sqlite3.Row]: ... # pyright: ignore[reportOverlappingOverload]
 
 	@typing.overload
-	def query (self, /, query: str, parameters: typing.Any = None, size: typing.Optional[int] = -1) -> typing.Generator[sqlite3.Row]: ...
+	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> typing.Generator[sqlite3.Row]: ...
 
-	def query (self, /, query: str, parameters: typing.Any = None, size: typing.Optional[int] = -1) -> QueryReturn:
+	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> QueryReturn:
 		'''
 		Creates and returns the results of a query
 
@@ -69,15 +67,27 @@ class Database:
 				break
 			yield ret
 
-class MacroError (BaseException): pass
-class MacroNotFound (MacroError): pass
-class MacroInUse (MacroError): pass
-class InsufficientPermissions (MacroError): pass
+class MacroError (Exception):
+	def __init__ (self, macro_name: str, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.macro_name = macro_name
+	def __str__ (self) -> str:
+		return f"Generic Macro Error with Macro `{self.macro_name}`"
+	async def send_error_message (self, interaction: Interaction, **kwargs):
+		await util.send_error_message(interaction, str(self), **kwargs)
+class MacroNotFound (MacroError):
+	def __str__ (self) -> str:
+		return f"Macro `{self.macro_name}` not found"
+class MacroInUse (MacroError):
+	def __str__ (self) -> str:
+		return f"Macro `{self.macro_name}` in use"
+class InsufficientPermissions (MacroError):
+	def __str__ (self) -> str:
+		return f"Insufficient Permissions for Macro `{self.macro_name}`"
 
 class MacroManager:
-	def __init__ (self, path: str, database: Database):
+	def __init__ (self, path: str):
 		self.path = path
-		self.database = database
 		with open(self.path, "r") as macros:
 			self.macros: typing.Dict[str, MacroData] = json.load(macros)
 	
@@ -90,29 +100,36 @@ class MacroManager:
 	def create_macro (self, /, name: str, author_id: DiscordUserId, code: str):
 		'''create a new macro'''
 		if name in self.macros:
-			raise MacroInUse(f"Macro '{name}' already exists")
+			raise MacroInUse(name)
 		code = code.strip()
-		print(code)
+		parameters = []
+		for match in re.finditer(r":([A-Z]{4})", code):
+			parameters.append(match.group(1))
 		self.macros[name] = {
 			"name": name,
 			"author_id": author_id,
 			"code": code,
-			"query": code.index("SELECT") == 0
+			"query": code.index("SELECT") == 0,
+			"parameters": parameters
 		}
 		self.save()
 	
 	def edit_macro (self, /, name: str, editor: DiscordUserId, new_name: typing.Optional[str], new_code: typing.Optional[str], bypass_checks: bool = False):
 		if name not in self.macros:
-			raise MacroNotFound(f"Macro '{name}' not found")
+			raise MacroNotFound(name)
 		if new_name in self.macros:
-			raise MacroInUse(f"Macro '{new_name}' already in use")
+			raise MacroInUse(new_name)
 		if editor != self.macros[name]["author_id"] and not bypass_checks:
-			raise InsufficientPermissions("Only the creator may edit this macro")
+			raise InsufficientPermissions(name)
 		self.macros[name]["name"] = new_name or self.macros[name]["name"]
 		if new_code:
 			new_code = new_code.strip()
+			parameters = []
+			for match in re.finditer(r":([A-Z]{4})", new_code):
+				parameters.append(match.group(1))
 			self.macros[name]["code"] = new_code
 			self.macros[name]["query"] = new_code.index("SELECT") == 0
+			self.macros[name]["parameters"] = parameters
 		self.save()
 
 	
@@ -120,17 +137,31 @@ class MacroManager:
 		for name in self.macros:
 			yield self.macros[name]
 	
-	def execute_macro (self, /, name: str, size: typing.Optional[int] = None, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None) -> typing.Optional[QueryReturn]:
-		'''
-		Execute a Macro
-
-		size should only be included if macro is a query
-		
-		'''
+	def get_macro (self, name) -> MacroData:
 		if name not in self.macros:
-			raise MacroNotFound(f"Macro '{name}' not found")
-		macro: MacroData = self.macros[name]
-		if not macro["query"]:
-			self.database.execute(parameters, query = macro["code"])
-		else:
-			return self.database.query(parameters=parameters, query=macro["code"], size=size)
+			raise MacroNotFound(name)
+		return self.macros[name]
+	
+if __name__ == "__main__":
+	print("Direct Access Enabled")
+	confessions = Database("data/confessions.db")
+	confessions_macro_manager = MacroManager("data/sql_macros.json")
+	while True:
+		try:
+			cmd = input("> ").strip()
+			if cmd == "QUIT":
+				break
+			if cmd == "macro":
+				cmd = input ("MACRO > ").strip()
+				if cmd.startswith("create_macro"):
+					_, name, *code = cmd.split(" ")
+					confessions_macro_manager.create_macro(name = name, code = " ".join(code), author_id = 0)
+				if cmd.startswith("view_macro"):
+					parsed = cmd.split(" ")
+					if len(parsed) == 1:
+						for macro in confessions_macro_manager.get_macros():
+							print(macro)
+					else:
+						print(confessions_macro_manager.get_macro(parsed[1]))
+		except Exception as e:
+			print(e)
