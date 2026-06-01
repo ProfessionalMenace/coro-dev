@@ -126,7 +126,7 @@ class MacroManager:
 			"name": name,
 			"author_id": author_id,
 			"code": code,
-			"query": code.index("SELECT") == 0,
+			"query": code.find("SELECT") == 0,
 			"parameters": parameters
 		}
 		self.save()
@@ -145,10 +145,17 @@ class MacroManager:
 			for match in re.finditer(r":([A-Z]{4})", new_code):
 				parameters.append(match.group(1))
 			self.macros[name]["code"] = new_code
-			self.macros[name]["query"] = new_code.index("SELECT") == 0
+			self.macros[name]["query"] = new_code.find("SELECT") == 0
 			self.macros[name]["parameters"] = parameters
 		self.save()
 
+	def delete_macro (self, /, name: str, editor: DiscordUserId, bypass_checks: bool = False):
+		if name not in self.macros:
+			raise MacroNotFound(name)
+		if editor != self.macros[name]["author_id"] and not bypass_checks:
+			raise InsufficientPermissions(name)
+		del self.macros[name]
+		self.save()
 	
 	def get_macros (self) -> typing.Generator[MacroData]:
 		for name in self.macros:

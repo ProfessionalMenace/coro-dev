@@ -7,5 +7,19 @@
     "parameters": [
       "CNUM"
     ]
+  },
+  "test": {
+    "name": "i",
+    "author_id": 795880771218309131,
+    "code": "SELECT 2",
+    "query": true,
+    "parameters": []
+  },
+  "asdf": {
+    "name": "asdf",
+    "author_id": 795880771218309131,
+    "code": "adfasdf",
+    "query": false,
+    "parameters": []
   }
 }

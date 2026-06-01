@@ -88,8 +88,9 @@ async def command_autocomplete_view_macros(interaction: discord.Interaction, cur
 async def confessions_database__view_macros__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
 		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
-	if isinstance(error, sql.MacroError):
-		return await error.send_error_message(interaction)
+	if isinstance(error, app_commands.CommandInvokeError):
+		if isinstance(error.original, sql.MacroError):
+			return await error.original.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
 @confessions_database_group.command(name = "edit-macro", description="Edit a macro you've created")
@@ -102,15 +103,43 @@ async def confessions_database__view_macros__error (interaction: discord.Interac
 )
 async def confessions_database__edit_macro(interaction: discord.Interaction, name: str, new_name: typing.Optional[str] = None, new_code: typing.Optional[str] = None):
 	await interaction.response.defer(ephemeral=True)
-	await interaction.followup.send("under construction sorry")
+	confessions_macro_manager.edit_macro(name = name, new_name = new_name, editor = interaction.user.id, new_code = new_code)
+	await interaction.followup.send("success")
 
+@confessions_database__edit_macro.autocomplete('name')
+async def command_autocomplete_edit_macros(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
+	return [app_commands.Choice(name = value["name"], value = value["name"])
+		for value in confessions_macro_manager.get_macros() if current in value["name"] and value["author_id"] == interaction.user.id][:25]
 @confessions_database__edit_macro.error
 async def confessions_database__edit_macro__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
 		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
-	if isinstance(error, sql.MacroError):
-		return await error.send_error_message(interaction, ephemeral=True)
+	if isinstance(error, app_commands.CommandInvokeError):
+		if isinstance(error.original, sql.MacroError):
+			return await error.original.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+
+@confessions_database_group.command(name = "delete-macro", description = "Delete a macro")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.describe(name = "Unwanted macro name")
+async def confessions_database__delete_macro (interaction: discord.Interaction, name: str):
+	await interaction.response.defer(ephemeral=True)
+	confessions_macro_manager.delete_macro(name = name, editor = interaction.user.id)
+	await interaction.followup.send("Success!")
+
+@confessions_database__delete_macro.autocomplete('name')
+async def command_autocomplete_delete_macros(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
+	return [app_commands.Choice(name = value["name"], value = value["name"])
+		for value in confessions_macro_manager.get_macros() if current in value["name"] and value["author_id"] == interaction.user.id][:25]
+@confessions_database__delete_macro.error
+async def confessions_database__delete_macro__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	if isinstance(error, app_commands.CommandInvokeError):
+		if isinstance(error.original, sql.MacroError):
+			return await error.original.send_error_message(interaction, ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+
 
 @confessions_database_group.command(name = "query", description="Query the database")
 @app_commands.checks.has_role(MOD_ROLE_ID)
@@ -167,8 +196,9 @@ class ParametersModal (discord.ui.Modal, title = "Parameters"):
 			)
 	
 async def on_error (interaction: discord.Interaction, error: Exception):
-	if isinstance(error, sql.MacroError):
-		return await error.send_error_message(interaction, ephemeral=True)
+	if isinstance(error, app_commands.CommandInvokeError):
+		if isinstance(error.original, sql.MacroError):
+			return await error.original.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
 
@@ -202,8 +232,9 @@ async def confessions_database__use_macro (interaction: discord.Interaction, mac
 async def confessions_database__use_macro__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
 		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
-	if isinstance(error, sql.MacroError):
-		return await error.send_error_message(interaction, ephemeral=True)
+	if isinstance(error, app_commands.CommandInvokeError):
+		if isinstance(error.original, sql.MacroError):
+			return await error.original.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 @confessions_database__use_macro.autocomplete('macro')
 async def command_autocomplete_use_macro(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
