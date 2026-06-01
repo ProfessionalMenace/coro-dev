@@ -3,16 +3,20 @@ from discord.ext import commands, tasks
 from discord.flags import Intents
 from discord import app_commands
 import typing
+import json
 
 import sql, util
 from config import (
 	SERVER_ID, # pyright: ignore[reportAttributeAccessIssue]
 	MOD_ROLE_ID, # pyright: ignore[reportAttributeAccessIssue]
 	BOT_COLOR # pyright: ignore[reportAttributeAccessIssue]
-) 
+)
 
-confessions = sql.Database("data/confessions.db")
-confessions_macro_manager = sql.MacroManager("data/sql_macros.json")
+with open("./config/valid_channels.json", "r") as channels:
+	VALID_CHANNELS = json.load(channels)
+
+confessions = sql.Database("./data/confessions.db")
+confessions_macro_manager = sql.MacroManager("./data/sql_macros.json")
 
 @tasks.loop(minutes=5)
 async def check_to_do():
@@ -171,6 +175,18 @@ async def confessions_database__query__error (interaction: discord.Interaction, 
 	if isinstance(error, app_commands.MissingRole):
 		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+	
+	
+@confessions_database_group.command(name = "save", description = "Save the database")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+async def confessions_database_group__save (interaction: discord.Interaction):
+	confessions.save()
+	await interaction.response.send_message("Saved", ephemeral=True)
+@confessions_database_group__save.error
+async def confessions_database_group__save__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
 class ParametersModal (discord.ui.Modal, title = "Parameters"):
 	def __init__ (self, select: bool, code: str, size: int, parameters: typing.Sequence[str]):
@@ -283,5 +299,53 @@ class ConfessionModal (discord.ui.Modal, title = "Submit a Confession"):
 @confessions_group.command(name = "confess", description = "Submit a confession")
 @app_commands.describe(channel = "Channel to confess to")
 # TODO: ADD CHOICES
-async def confessions_group__confess (interaction: discord.Interaction, channel: typing.Optional[discord.TextChannel] = None):
-	await interaction.response.send_modal(ConfessionModal(channel or interaction.channel)) # pyright: ignore[reportArgumentType]
+async def confessions_group__confess (interaction: discord.Interaction, channel: typing.Optional[str] = None):
+	channel = channel or str(interaction.channel.id) # pyright: ignore[reportOptionalMemberAccess, reportAssignmentType]
+	if channel not in VALID_CHANNELS: # pyright: ignore[reportOptionalMemberAccess]
+		await interaction.response.send_message("This is not a valid channel", ephemeral=True)
+	else:
+		await interaction.response.send_modal(ConfessionModal(interaction.guild.get_channel(int(channel)))) # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
+
+@confessions_group__confess.autocomplete('channel')
+async def command_autocomplete_confess(interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
+	return [app_commands.Choice(name = channel.name, value = str(channel.id)) # pyright: ignore[reportOptionalMemberAccess]
+		for _channel in VALID_CHANNELS if current in (channel := interaction.guild.get_channel(VALID_CHANNELS[_channel]["id"])).name][:25] # pyright: ignore[reportOptionalMemberAccess]
+
+
+@confessions_group.command(name = "add-channel", description = "Add a new channel to the confession channel list")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.describe(channel = "The wanted channel")
+async def confessions_group__add_channel (interaction: discord.Interaction, channel: discord.TextChannel):
+	await interaction.response.defer(ephemeral = True)
+	VALID_CHANNELS[str(channel.id)] = {"id": channel.id}
+	with open("./config/valid_channels.json", "w") as channels:
+		json.dump(VALID_CHANNELS, channels, indent = 2)
+	await interaction.followup.send(f"Added {channel.mention} successfully!")
+@confessions_group__add_channel.error
+async def confessions_group__add_channel__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+	
+@confessions_group.command(name = "remove-channel", description = "Remove a channel from the confession channel list")
+@app_commands.checks.has_role(MOD_ROLE_ID)
+@app_commands.describe(channel = "The unwanted channel")
+async def confessions_group__remove_channel (interaction: discord.Interaction, channel: discord.TextChannel):
+	await interaction.response.defer(ephemeral = True)
+	if str(channel.id) in VALID_CHANNELS:
+		del VALID_CHANNELS[str(channel.id)]
+		with open("./config/valid_channels.json", "w") as channels:
+			json.dump(VALID_CHANNELS, channels, indent = 2)
+		await interaction.followup.send(f"Removed {channel.mention} successfully!")
+	else:
+		await interaction.followup.send(f"{channel.mention} not in vaild channel list")
+@confessions_group__remove_channel.error
+async def confessions_group__remove_channel__error (interaction: discord.Interaction, error: Exception):
+	if isinstance(error, app_commands.MissingRole):
+		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+	
+@confessions_group.command(name = "view-channels", description = "View confession channel list")
+async def confessions_group__view_channels (interaction: discord.Interaction):
+	await interaction.response.defer()
+	await interaction.followup.send("## Current Confessions Channel List\n" + "\n".join(f"<#{id}>" for id in VALID_CHANNELS))
