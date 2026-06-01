@@ -51,10 +51,15 @@ class Database:
 		self.cursor = self.connection.cursor()
 		self.cursor.row_factory = sqlite3.Row
 		self.cursor.execute('''CREATE TABLE IF NOT EXISTS confessions (
-											id INT PRIMARY_KEY,
+											id INTEGER PRIMARY KEY,
 											author_id INTEGER,
 											message_id INTEGER
-		);''') # I feel like i'm missing a key here but I can't remember what it is
+		);''')
+		self.cursor.execute('''CREATE TABLE IF NOT EXISTS confession_data (
+											id INTEGER PRIMARY KEY,
+											content TEXT,
+											attachment_id TEXT
+		);''')
 	
 	def save (self):
 		self.connection.commit()
@@ -67,6 +72,10 @@ class Database:
 		if len(parameters) > 1 and parameters[0] is not None: self.cursor.executemany(query, parameters)
 		else: self.cursor.execute(query, *parameters)
 	
+	def query_single_item(self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None) -> typing.Optional[sqlite3.Row]:
+		for row in self.query(query = query, parameters=parameters, size = 1):
+			return row
+
 	def query (self, /, query: str, parameters: typing.Optional[typing.Dict[str, typing.Any]] = None, size: typing.Optional[int] = -1) -> QueryReturn:
 		'''
 		Creates and returns the results of a query
