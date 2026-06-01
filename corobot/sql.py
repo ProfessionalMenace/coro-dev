@@ -28,7 +28,7 @@ class Database:
 		self.connection = sqlite3.connect(self.path)
 		self.cursor = self.connection.cursor()
 		self.cursor.execute('''CREATE TABLE IF NOT EXISTS confessions (
-											id INT PRIMARY_KEY
+											id INT PRIMARY_KEY,
 											author_id INTEGER,
 											message_id INTEGER
 		);''') # I feel like i'm missing a key here but I can't remember what it is
@@ -163,5 +163,21 @@ if __name__ == "__main__":
 							print(macro)
 					else:
 						print(confessions_macro_manager.get_macro(parsed[1]))
+			if cmd == "sql":
+				cmd = input ("SQL > ").strip()
+				if cmd == "query":
+					sql = input("instructions > ").strip()
+					size = int(input("size > ").strip())
+					parameters = {}
+					has_params = False
+					for match in re.finditer(r":([A-Z]{4})", sql):
+						has_params = True
+						parameters[match.group(1)] = input(f"Parameter {match.group(1)} > ")
+					ret = confessions.query(query = sql, size = size, parameters=parameters if has_params else None)
+					if size == 1:
+						ret = [ret]
+					for row in ret:
+						print(row)
+					
 		except Exception as e:
 			print(e)
