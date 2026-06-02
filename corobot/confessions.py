@@ -188,7 +188,7 @@ class QueryModal(discord.ui.Modal, title = "Query Database"):
 )
 async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1, rows: int = 25):
 	if query == "POP-OUT":
-		return await interaction.response.send_modal(QueryModal(select, size))
+		return await interaction.response.send_modal(QueryModal(select, size, rows))
 	await interaction.response.defer()
 	query = query.strip()
 	if not select:
@@ -199,7 +199,7 @@ async def confessions_database__query (interaction: discord.Interaction, query: 
 			interaction = interaction,
 			title = "Query Results",
 			followup=True,
-			iterator = confessions.query(query = query, size = size, rows = rows), # pyright: ignore[reportCallIssue, reportArgumentType]
+			iterator = confessions.query(query = query, size = size), # pyright: ignore[reportCallIssue, reportArgumentType]
 			known_size = size if size != -1 else None,
 			text = sql.rows_to_discord,
 			items_per_page = rows
