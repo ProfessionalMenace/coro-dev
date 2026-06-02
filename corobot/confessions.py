@@ -171,6 +171,11 @@ class QueryModal(discord.ui.Modal, title = "Query Database"):
 				items_per_page = 25
 			)
 
+	async def on_error (self, interaction: discord.Interaction, error: Exception):
+		if isinstance(error, app_commands.MissingRole):
+			return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+		await util.send_error_message(interaction, "Unexpected Failure! Please Report (or its a sql error)\n" + str(error), ephemeral=True)
+
 @confessions_database_group.command(name = "query", description="Query the database")
 @app_commands.checks.has_role(MOD_ROLE_ID)
 @app_commands.describe(
@@ -201,7 +206,7 @@ async def confessions_database__query (interaction: discord.Interaction, query: 
 async def confessions_database__query__error (interaction: discord.Interaction, error: Exception):
 	if isinstance(error, app_commands.MissingRole):
 		return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
-	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+	await util.send_error_message(interaction, "Unexpected Failure! Please Report (or its a sql error)\n" + str(error), ephemeral=True)
 	
 	
 @confessions_database_group.command(name = "save", description = "Save the database")
@@ -299,7 +304,10 @@ async def submit_confession (interaction: discord.Interaction, channel: discord.
 		embed.set_image(url = attachments[0].url)
 	confessions.execute(params, query='''INSERT INTO confession_data(id, content, attachment_id) VALUES (:COID, :CONT, :ATCH)''')
 	if (msg := channel.last_message):
-		await msg.edit(view = None)
+		try:
+			await msg.edit(view = None)
+		except:
+			pass
 	message = await channel.send(embed=embed, view=ConfessionView(_id))
 	confessions.execute({"COID": _id, "MEID": message.id}, query = '''UPDATE confessions SET message_id = :MEID WHERE id = :COID''')
 
