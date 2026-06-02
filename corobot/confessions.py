@@ -149,10 +149,11 @@ async def confessions_database__delete_macro__error (interaction: discord.Intera
 class QueryModal(discord.ui.Modal, title = "Query Database"):
 	query = discord.ui.Label(text = "Query", component=discord.ui.TextInput(style=discord.TextStyle.paragraph))
 
-	def __init__ (self, select: bool, size: int):
+	def __init__ (self, select: bool, size: int, rows: int):
 		super().__init__()
 		self.select = select
 		self.size = size
+		self.rows = rows
 	
 	async def on_submit(self, interaction: discord.Interaction) -> None:
 		await interaction.response.defer()
@@ -168,13 +169,14 @@ class QueryModal(discord.ui.Modal, title = "Query Database"):
 				iterator = confessions.query(query = query, size = self.size), # pyright: ignore[reportCallIssue, reportArgumentType]
 				known_size = self.size if self.size != -1 else None,
 				text = sql.rows_to_discord,
-				items_per_page = 25
+				items_per_page = self.rows
 			)
 
 	async def on_error (self, interaction: discord.Interaction, error: Exception):
 		if isinstance(error, app_commands.MissingRole):
 			return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
 		await util.send_error_message(interaction, "Unexpected Failure! Please Report (or its a sql error)\n" + str(error), ephemeral=True)
+		await interaction.channel.send(f"Code\n```sql\n{self.query.component.value.strip()}```") # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
 
 @confessions_database_group.command(name = "query", description="Query the database")
 @app_commands.checks.has_role(MOD_ROLE_ID)
@@ -182,8 +184,9 @@ class QueryModal(discord.ui.Modal, title = "Query Database"):
 	query = "SQL query to request. input POP-OUT to get a paragraph input.",
 	select = "Whether or not this query is a select query",
 	size = "How many rows to return, only does something if select is True. Leave blank for all",
+	rows = "How many rows per page, default 25"
 )
-async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1):
+async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1, rows: int = 25):
 	if query == "POP-OUT":
 		return await interaction.response.send_modal(QueryModal(select, size))
 	await interaction.response.defer()
@@ -196,10 +199,10 @@ async def confessions_database__query (interaction: discord.Interaction, query: 
 			interaction = interaction,
 			title = "Query Results",
 			followup=True,
-			iterator = confessions.query(query = query, size = size), # pyright: ignore[reportCallIssue, reportArgumentType]
+			iterator = confessions.query(query = query, size = size, rows = rows), # pyright: ignore[reportCallIssue, reportArgumentType]
 			known_size = size if size != -1 else None,
 			text = sql.rows_to_discord,
-			items_per_page = 25
+			items_per_page = rows
 		)
 	
 @confessions_database__query.error
