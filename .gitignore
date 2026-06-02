@@ -1,3 +1,7 @@
+# Corobot files 
+secrets.json
+confessions.db
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,7 +220,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-
-# Secrets
-secrets.json
