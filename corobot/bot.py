@@ -30,6 +30,8 @@ async def on_ready():
 	for guild in bot.guilds:
 		if guild.id == SERVER_ID:
 			bot.CoroboCult = guild
+	
+	confessions.save_db.start()
 
 	# set status
 	activity = discord.CustomActivity("Under Development | Currently Being Hosted By " + CURRENT_HOST)

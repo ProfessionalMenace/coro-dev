@@ -60,6 +60,17 @@ class Database:
 											content TEXT,
 											attachment_id TEXT
 		);''')
+		self.cursor.execute('''CREATE TABLE IF NOT EXISTS replies (
+											id INTEGER PRIMARY KEY,
+											confession_id INTEGER,
+											author_id INTEGER,
+											message_id INTEGER
+		);''')
+		self.cursor.execute('''CREATE TABLE IF NOT EXISTS reply_data (
+											id INTEGER PRIMARY KEY,
+											content TEXT,
+											attachment_id TEXT
+		);''')
 	
 	def save (self):
 		self.connection.commit()
