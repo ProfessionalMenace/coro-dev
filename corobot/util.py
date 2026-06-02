@@ -90,13 +90,14 @@ class Paginator (discord.ui.View):
 
 
 async def paginator(* , interaction: discord.Interaction, title: str, followup: bool = False, known_size: typing.Optional[int] = None, iterator: typing.Sequence[typing.Any], text: typing.Callable[[typing.Sequence[typing.Any]], str], items_per_page: int, **kwargs: typing.Any):
+	msg = None
 	if followup:
 		if "ephemeral" in kwargs:
 			del kwargs["ephemeral"] # not supported by followup
-		await interaction.followup.send("Generating Paginator", **kwargs)
+		msg = await interaction.followup.send("Generating Paginator", **kwargs)
 	else:
 		await interaction.response.send_message("Generating Paginator", **kwargs)
-	msg = await interaction.original_response()
+		msg = await interaction.original_response()
 	_paginator = Paginator(
 		user = interaction.user,
 		title = title,

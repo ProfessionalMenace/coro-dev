@@ -146,15 +146,41 @@ async def confessions_database__delete_macro__error (interaction: discord.Intera
 			return await error.original.send_error_message(interaction, ephemeral=True)
 	await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 
+class QueryModal(discord.ui.Modal, title = "Query Database"):
+	query = discord.ui.Label(text = "Query", component=discord.ui.TextInput(style=discord.TextStyle.paragraph))
+
+	def __init__ (self, select: bool, size: int):
+		super().__init__()
+		self.select = select
+		self.size = size
+	
+	async def on_submit(self, interaction: discord.Interaction) -> None:
+		await interaction.response.defer()
+		query = self.query.component.value.strip() # pyright: ignore[reportAttributeAccessIssue]
+		if not self.select:
+			confessions.execute(query = query)
+			await interaction.followup.send("Database Updated")
+		else:
+			await util.paginator(
+				interaction = interaction,
+				title = "Query Results",
+				followup=True,
+				iterator = confessions.query(query = query, size = self.size), # pyright: ignore[reportCallIssue, reportArgumentType]
+				known_size = self.size if self.size != -1 else None,
+				text = sql.rows_to_discord,
+				items_per_page = 25
+			)
 
 @confessions_database_group.command(name = "query", description="Query the database")
 @app_commands.checks.has_role(MOD_ROLE_ID)
 @app_commands.describe(
-	query = "SQL query to request",
+	query = "SQL query to request. input POP-OUT to get a paragraph input.",
 	select = "Whether or not this query is a select query",
 	size = "How many rows to return, only does something if select is True. Leave blank for all",
 )
 async def confessions_database__query (interaction: discord.Interaction, query: str, select: bool = False, size: int = -1):
+	if query == "POP-OUT":
+		return await interaction.response.send_modal(QueryModal(select, size))
 	await interaction.response.defer()
 	query = query.strip()
 	if not select:
@@ -310,7 +336,7 @@ async def submit_reply (interaction: discord.Interaction, _id: int, content: str
 		except:
 			pass
 	message = await thread.send(embed=embed, view=ReplyView(_id))
-	confessions.execute({"REID": _id, "MEID": message.id}, query = '''UPDATE replies SET message_id = :MEID WHERE id = :REID''')
+	confessions.execute({"REID": rid, "MEID": message.id}, query = '''UPDATE replies SET message_id = :MEID WHERE id = :REID''')
 
 class ConfessionView (discord.ui.View):
 	def __init__ (self, num: int):
