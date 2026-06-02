@@ -21,14 +21,13 @@ def rows_to_discord (rows: typing.Sequence[sqlite3.Row]) -> str:
 		for key in row.keys():
 			categories[key] = max(categories[key], len(str(row[key])), len(key))
 	for category in categories:
-		out += (" {:<" + str(categories[category]) + "} |").format(category)
+		out += (" {:<" + str(max(categories[category] or 0, 1)) + "} |").format(category)
 	out = out[:-2] + "\n"
 	out += "-" * (len(out) - 5)
 	for row in rows:
 		out += "\n"
 		for key in row.keys():
-			print(" {:<" + str(categories[key]) + "} |")
-			out += (" {:<" + str(categories[key]) + "} |").format(row[key])
+			out += (" {:<" + str(max(categories[key] or 0, 1)) + "} |").format(row[key] or "None")
 		out = out[:-2]
 	out += "\n```"
 	return out
