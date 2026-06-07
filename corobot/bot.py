@@ -30,6 +30,7 @@ class Corobot(commands.Bot):
 
 	async def setup_hook(self):
 		await self.add_cog(MetaCog(self))
+		await self.load_extension("moderation")
 		self.tree.add_command(confessions.confessions_group)
 
 		# sync
