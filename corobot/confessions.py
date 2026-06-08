@@ -4,13 +4,12 @@ from discord.flags import Intents
 from discord import app_commands
 import typing
 import json
+import logging
 
-import sql, util
-from config import (
-	SERVER_ID, # pyright: ignore[reportAttributeAccessIssue]
-	MOD_ROLE_ID, # pyright: ignore[reportAttributeAccessIssue]
-	BOT_COLOR # pyright: ignore[reportAttributeAccessIssue]
-)
+from corobot import sql, util
+from corobot.config import SERVER_ID, MOD_ROLE_ID, BOT_COLOR
+
+logger = logging.getLogger(__name__)
 
 with open("./config/valid_channels.json", "r") as channels:
 	VALID_CHANNELS = json.load(channels)
@@ -20,7 +19,7 @@ confessions_macro_manager = sql.MacroManager("./data/sql_macros.json")
 
 @tasks.loop(minutes=5)
 async def save_db():
-	print("SAVING")
+	logger.info("Saving confessions database")
 	confessions.save()
 	#TODO: create a backup every 6 hours, max 4
 

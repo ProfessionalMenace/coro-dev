@@ -3,16 +3,13 @@ from discord.ext import commands, tasks
 from discord.flags import Intents
 from discord import app_commands
 import typing
+import logging
 
-import confessions
-from meta import MetaCog
+from corobot import confessions
+from corobot.meta import MetaCog
+from corobot.config import SERVER_ID, CURRENT_HOST
 
-from config import (
-	SERVER_ID,  # pyright: ignore[reportAttributeAccessIssue]
-	BOT_COLOR,  # pyright: ignore[reportAttributeAccessIssue]
-	CURRENT_HOST,  # pyright: ignore[reportAttributeAccessIssue]
-)
-
+logger = logging.getLogger(__name__)
 guild = discord.Object(id=SERVER_ID)
 
 
@@ -29,7 +26,7 @@ class CommandTree(app_commands.CommandTree):
 
 class Corobot(commands.Bot):
 	def __init__(self, *args, **kwargs):
-		super().__init__(*args, tree_cls=CommandTree, intents=Intents.all(), **kwargs)
+		super().__init__(*args, **kwargs)
 
 	async def setup_hook(self):
 		await self.add_cog(MetaCog(self))
@@ -38,12 +35,10 @@ class Corobot(commands.Bot):
 		# sync
 		self.tree.copy_global_to(guild=guild)
 		synced = await self.tree.sync(guild=guild)
-		print([command.name for command in synced])
+		logger.info([command.name for command in synced])
 
 	async def on_ready(self):
-		print(
-			f"Logged in as {self.user.name} - {self.user.id}"
-		)  # pyright: ignore[reportOptionalMemberAccess]
+		logger.info(f"Logged in as {self.user.name} - {self.user.id}")
 		for guild in self.guilds:
 			if guild.id == SERVER_ID:
 				self.CoroboCult = guild
@@ -55,3 +50,11 @@ class Corobot(commands.Bot):
 			"Under Development | Currently Being Hosted By " + CURRENT_HOST
 		)
 		await self.change_presence(activity=activity, status=discord.Status.idle)
+
+def run_bot(TOKEN: typing.Optional[str]):
+	bot = Corobot(
+    command_prefix="!",
+    tree_cls=CommandTree,
+    intents=Intents.all()
+  )
+	bot.run(TOKEN, log_handler=None)

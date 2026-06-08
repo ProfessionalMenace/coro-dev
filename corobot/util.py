@@ -4,9 +4,7 @@ from discord.flags import Intents
 from discord import app_commands
 import typing
 
-from config import (
-	BOT_COLOR # pyright: ignore[reportAttributeAccessIssue]
-)
+from corobot.config import BOT_COLOR
 
 async def send_error_message (interaction: discord.Interaction, msg: str, **kwargs: typing.Any):
 	if interaction.response.is_done():

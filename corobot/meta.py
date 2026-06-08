@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import typing
-from config import BOT_COLOR
+from corobot.config import BOT_COLOR
 
 
 class MetaCog(commands.Cog):

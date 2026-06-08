@@ -11,7 +11,7 @@ from discord import Interaction
 import re
 from collections import defaultdict
 
-import util
+import corobot.util
 
 def rows_to_discord (rows: typing.Sequence[sqlite3.Row]) -> str:
 	'''Converts a sequence of rows into formatted text for discord'''
