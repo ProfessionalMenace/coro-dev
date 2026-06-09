@@ -1,39 +1,50 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from config import MOD_ROLE_ID, LOG_CHANNEL_ID
+from corobot.config import MOD_ROLE_ID, LOG_CHANNEL_ID
 import typing
 import logging
-import json
+
+logger = logging.getLogger(__name__)
+
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_role(MOD_ROLE_ID)
 class ModerationGroup(app_commands.Group):
 	def __init__(self):
 		super().__init__(name="mod", description="Moderation commands")
-		
-	async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+
+	async def on_error(
+		self, interaction: discord.Interaction, error: app_commands.AppCommandError
+	):
 		if isinstance(error, app_commands.errors.MissingRole):
 			return await interaction.response.send_message(
-				"You don't have the required role to use this command.", ephemeral=True)
-		
+				"You don't have the required role to use this command.", ephemeral=True
+			)
+
 		raise error
+
 
 class ModerationCog(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
-		self.log_channel = None 
+		self.log_channel = None
 		super().__init__()
-	
+
 	@commands.Cog.listener()
 	async def on_ready(self):
 		await self.bot.wait_until_ready()
 		self.log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
-		logging.log(logging.INFO, f"Moderation logging channel has been set to {self.log_channel.id}")
-	
+		if self.log_channel:
+			logger.info(
+				f"Moderation logging channel has been set to {self.log_channel.id}"
+			)
+		else:
+			logger.warning("Moderation logging channel could not be set!")
+
 	mod_group = ModerationGroup()
 
-	@mod_group.command(name = "log-here", description="Set the current log channel")
+	@mod_group.command(name="log-here", description="Set the current log channel")
 	async def set_log_channel(self, interaction: discord.Interaction):
 		"""Set the current log channel"""
 		self.log_channel = interaction.channel
@@ -41,8 +52,8 @@ class ModerationCog(commands.Cog):
 			f"Log channel updated {interaction.channel.mention}"
 		)
 
-	@mod_group.command(name = "warn", description="Send user a warning")
-	@app_commands.describe(target="Discord user ID", reason="Warning Message")
+	@mod_group.command(name="warn", description="Send user a warning")
+	@app_commands.describe(target="Discord user", reason="Warning Message")
 	async def warn(
 		self,
 		interaction: discord.Interaction,
@@ -63,14 +74,15 @@ class ModerationCog(commands.Cog):
 			)
 
 		embed = discord.Embed(
-			title = "You have been warned!",
-			description = reason,
-			color=discord.Color.yellow()
+			title="You have been warned!",
+			description=reason,
+			color=discord.Color.yellow(),
+			timestamp=interaction.created_at,
 		)
 
 		embed.set_footer(
-			text = f"Made by CoroboCult Mod Team",
-			icon_url = interaction.client.user.avatar.url
+			text=f"Made by CoroboCult Mod Team",
+			icon_url=interaction.client.user.avatar.url,
 		)
 
 		try:
@@ -84,30 +96,47 @@ class ModerationCog(commands.Cog):
 			await interaction.followup.send(
 				"Message could not be delivered!", ephemeral=True
 			)
-		
+
 		finally:
 			embed.title = f"User: {target.display_name} has been warned!"
-			embed.add_field(name = "target", value = target.mention)
-			embed.add_field(name = "target id", value = target.id)
-			embed.add_field(name = "moderator", value = interaction.user.mention)
+			embed.add_field(name="target", value=target.mention)
+			embed.add_field(name="moderator", value=interaction.user.mention)
 
 			await self.log_channel.send(embed=embed)
 
-	@commands.Cog.listener()
-	async def on_message_delete(self, message):
-		"""Print the edited message"""
-		if message.author.bot or self.log_channel is None:
+	async def log_message(self, title: str, message: discord.Message):
+		"""Log message"""
+		if message.author.bot:
 			return
-		
+
+		if self.log_channel is None:
+			return
+
+		if not message.content:
+			return
+
 		embed = discord.Embed(
-			title=f"Message Deleted",
+			title=title,
 			description=message.content,
 			timestamp=message.created_at,
+			color=discord.Color.green(),
 		)
-		embed.add_field(name = "Author:", value = message.author.mention)
-		embed.add_field(name = "Channel:", value = message.channel.mention)
+		embed.add_field(name="Author:", value=message.author.mention)
+		embed.add_field(name="Channel:", value=message.channel.mention)
 
 		await self.log_channel.send(embed=embed)
+
+	@commands.Cog.listener()
+	async def on_message_delete(self, message: discord.Message):
+		"""Log deleted message"""
+		await self.log_message("Message Deleted", message)
+
+	@commands.Cog.listener()
+	async def on_message_edit(self, before: discord.Message, after: discord.Message):
+		"""Log edited messages"""
+		if before.content != after.content:
+			await self.log_message("Message Edited", before)
+
 
 async def setup(bot):
 	await bot.add_cog(ModerationCog(bot))

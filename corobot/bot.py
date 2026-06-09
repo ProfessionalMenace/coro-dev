@@ -30,7 +30,7 @@ class Corobot(commands.Bot):
 
 	async def setup_hook(self):
 		await self.add_cog(MetaCog(self))
-		await self.load_extension("moderation")
+		await self.load_extension("corobot.moderation")
 		self.tree.add_command(confessions.confessions_group)
 
 		# sync
@@ -54,8 +54,8 @@ class Corobot(commands.Bot):
 
 def run_bot(TOKEN: typing.Optional[str]):
 	bot = Corobot(
-    command_prefix="!",
-    tree_cls=CommandTree,
-    intents=Intents.all()
-  )
+		command_prefix="!",
+		tree_cls=CommandTree,
+		intents=Intents.all()
+	)
 	bot.run(TOKEN, log_handler=None)
