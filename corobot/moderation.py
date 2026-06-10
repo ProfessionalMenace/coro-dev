@@ -1,11 +1,14 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from corobot.config import MOD_ROLE_ID, LOG_CHANNEL_ID
 import typing
 import logging
+import sqlite3
+import datetime
 
 logger = logging.getLogger(__name__)
+DB_PATH = "data/moderation.db"
 
 
 @app_commands.default_permissions(moderate_members=True)
@@ -25,24 +28,104 @@ class ModerationGroup(app_commands.Group):
 		raise error
 
 
-class ModerationCog(commands.Cog):
-	def __init__(self, bot):
+class ModerationDBManager():
+	def __init__(self, db_path) -> None:
+		self.db_path = db_path
+
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute("""
+				CREATE TABLE IF NOT EXISTS mod_actions (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					action_time TIMESTAMP,
+					target_id INTEGER,
+					moderator_id INTEGER,
+					action_type CHAR(20),
+					reason TEXT
+				)
+			""")
+			conn.commit()
+	
+	def log_mod_action(self, target_id: int, moderator_id: int, mod_action_type: str, reason: str):
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute(
+				"""
+				INSERT INTO mod_actions (action_time, target_id, moderator_id, action_type, reason)
+					VALUES (?, ?, ?, ?, ?)
+				""",
+				(
+					int(datetime.datetime.now().timestamp()),
+					target_id,
+					moderator_id,
+					mod_action_type,
+					reason
+				)
+			)
+			conn.commit()
+
+
+class MessageLogDBManager():
+	def __init__(self, db_path):
+		self.db_path = db_path
+
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute("""
+				CREATE TABLE IF NOT EXISTS message_log (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					detection_time TIMESTAMP,
+					author_id INTEGER,
+					message_content TEXT
+				)
+			""")
+			conn.commit()
+	
+	def log_message(self, author_id: int, message_content: int):
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute(
+				"""
+				INSERT INTO message_log (detection_time, author_id, message_content)
+					VALUES (?, ?, ?)
+				""",
+				(
+					int(datetime.datetime.now().timestamp()),
+					author_id,
+					message_content
+				)
+			)
+			conn.commit()
+	
+	def delete_older_than(self, timestamp: int):
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute(
+				f"""
+				DELETE FROM message_log WHERE detection_time < ?;
+				""",
+				(timestamp,)
+			)
+			conn.commit()
+	
+
+class ModerationCog(commands.Cog, ModerationDBManager):
+	mod_group = ModerationGroup()
+
+	def __init__(self, bot, db_path, log_channel_id):
 		self.bot = bot
 		self.log_channel = None
-		super().__init__()
+		self.log_channel_id = log_channel_id 
+		commands.Cog.__init__(self)
+		ModerationDBManager.__init__(self, db_path)
 
 	@commands.Cog.listener()
 	async def on_ready(self):
-		await self.bot.wait_until_ready()
-		self.log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+		self.log_channel = self.bot.get_channel(self.log_channel_id)
 		if self.log_channel:
-			logger.info(
-				f"Moderation logging channel has been set to {self.log_channel.id}"
-			)
+			logger.info(f"Moderation logging channel has been set to {self.log_channel.id}")
 		else:
 			logger.warning("Moderation logging channel could not be set!")
-
-	mod_group = ModerationGroup()
 
 	@mod_group.command(name="log-here", description="Set the current log channel")
 	async def set_log_channel(self, interaction: discord.Interaction):
@@ -98,45 +181,46 @@ class ModerationCog(commands.Cog):
 			)
 
 		finally:
+			# log database
+			self.log_mod_action(
+				target_id=target.id,
+				moderator_id=interaction.user.id,
+				mod_action_type="WARN",
+				reason=reason
+			)
+			
+			# log mod channel
 			embed.title = f"User: {target.display_name} has been warned!"
 			embed.add_field(name="target", value=target.mention)
 			embed.add_field(name="moderator", value=interaction.user.mention)
-
 			await self.log_channel.send(embed=embed)
 
-	async def log_message(self, title: str, message: discord.Message):
-		"""Log message"""
-		if message.author.bot:
-			return
 
-		if self.log_channel is None:
-			return
-
-		if not message.content:
-			return
-
-		embed = discord.Embed(
-			title=title,
-			description=message.content,
-			timestamp=message.created_at,
-			color=discord.Color.green(),
-		)
-		embed.add_field(name="Author:", value=message.author.mention)
-		embed.add_field(name="Channel:", value=message.channel.mention)
-
-		await self.log_channel.send(embed=embed)
-
+class MessageLoggerCog(commands.Cog, MessageLogDBManager):
+	def __init__(self, bot, db_path):
+		self.bot = bot
+		self.prune_db.start()
+		commands.Cog.__init__(self)
+		MessageLogDBManager.__init__(self, db_path)
+	
+	@tasks.loop(minutes=720)
+	async def prune_db(self):
+		"""Periodically delete old messages"""
+		cutoff = datetime.datetime.now() - datetime.timedelta(hours=12)
+		self.delete_older_than(int(cutoff.timestamp()))
+		logger.info(f"Prunning database entries older than {cutoff}")
+	
 	@commands.Cog.listener()
 	async def on_message_delete(self, message: discord.Message):
-		"""Log deleted message"""
-		await self.log_message("Message Deleted", message)
+		"""Log deleted messages"""
+		self.log_message(message.author.id, message.content)
 
 	@commands.Cog.listener()
 	async def on_message_edit(self, before: discord.Message, after: discord.Message):
 		"""Log edited messages"""
-		if before.content != after.content:
-			await self.log_message("Message Edited", before)
-
+		if len(before.content) != 0 and before.content != after.content:
+			self.log_message(before.author.id, before.content)
 
 async def setup(bot):
-	await bot.add_cog(ModerationCog(bot))
+	await bot.add_cog(ModerationCog(bot, DB_PATH, LOG_CHANNEL_ID))
+	await bot.add_cog(MessageLoggerCog(bot, DB_PATH))
