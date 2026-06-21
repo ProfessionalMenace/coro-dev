@@ -97,7 +97,19 @@ class MessageLogDBManager():
 			)
 			conn.commit()
 	
+	def get_message_logs(self, author_id: int):
+		with sqlite3.connect(self.db_path) as conn:
+			cursor = conn.cursor()
+			cursor.execute(
+				"""
+				SELECT FROM message_log WHERE author_id == ?
+				""",
+				(author_id,)
+			)
+			conn.commit()
+	
 	def delete_older_than(self, timestamp: int):
+		"""Delete messages older than a given timestamp"""
 		with sqlite3.connect(self.db_path) as conn:
 			cursor = conn.cursor()
 			cursor.execute(
@@ -199,14 +211,17 @@ class ModerationCog(commands.Cog, ModerationDBManager):
 class MessageLoggerCog(commands.Cog, MessageLogDBManager):
 	def __init__(self, bot, db_path):
 		self.bot = bot
-		self.prune_db.start()
 		commands.Cog.__init__(self)
 		MessageLogDBManager.__init__(self, db_path)
-	
+
+	@commands.Cog.listener()
+	async def on_ready(self):
+		self.prune_db.start()
+
 	@tasks.loop(minutes=720)
 	async def prune_db(self):
 		"""Periodically delete old messages"""
-		cutoff = datetime.datetime.now() - datetime.timedelta(hours=12)
+		cutoff = datetime.datetime.now() - datetime.timedelta(hours=24)
 		self.delete_older_than(int(cutoff.timestamp()))
 		logger.info(f"Prunning database entries older than {cutoff}")
 	
