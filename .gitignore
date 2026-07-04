@@ -1,6 +1,7 @@
 # Corobot files 
 secrets.json
 confessions.db
+moderation.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

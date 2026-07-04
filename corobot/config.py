@@ -12,3 +12,4 @@ CURRENT_HOST = _secrets_data["CURRENT HOST"]
 BOT_COLOR = _config_data["BOT COLOR"]
 SERVER_ID = int(_config_data["SERVER ID"])
 MOD_ROLE_ID = int(_config_data["MOD ROLE ID"])
+LOG_CHANNEL_ID = int(_config_data["LOG CHANNEL ID"])
