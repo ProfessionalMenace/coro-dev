@@ -91,3 +91,6 @@ class MetaCog(commands.Cog):
 				for command in self.bot.tree.walk_commands(guild=interaction.guild)
 			][:25]
 		)
+
+async def setup(bot):
+	await bot.add_cog(MetaCog(bot))

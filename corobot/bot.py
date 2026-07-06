@@ -29,7 +29,7 @@ class Corobot(commands.Bot):
 		super().__init__(*args, **kwargs)
 
 	async def setup_hook(self):
-		await self.add_cog(MetaCog(self))
+		await self.load_extension("corobot.meta")
 		await self.load_extension("corobot.moderation")
 		self.tree.add_command(confessions.confessions_group)
 
