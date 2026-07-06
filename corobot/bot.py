@@ -48,7 +48,7 @@ class Corobot(commands.Bot):
 
 		# set status
 		activity = discord.CustomActivity(
-			"Under Development | Currently Being Hosted By " + CURRENT_HOST
+			"Currently Being Hosted By " + CURRENT_HOST
 		)
 		await self.change_presence(activity=activity, status=discord.Status.idle)
 
