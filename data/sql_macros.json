@@ -8,18 +8,13 @@
       "CNUM"
     ]
   },
-  "test": {
-    "name": "i",
-    "author_id": 795880771218309131,
-    "code": "SELECT 2",
+  "get_other_messages": {
+    "name": "get_other_messages",
+    "author_id": 0,
+    "code": "SELECT x.id FROM confessions AS x JOIN (SELECT * FROM confessions WHERE id = :CNUM LIMIT 1) AS l ON x.author_id = l.author_id;",
     "query": true,
-    "parameters": []
-  },
-  "asdf": {
-    "name": "asdf",
-    "author_id": 795880771218309131,
-    "code": "adfasdf",
-    "query": false,
-    "parameters": []
+    "parameters": [
+      "CNUM"
+    ]
   }
 }
