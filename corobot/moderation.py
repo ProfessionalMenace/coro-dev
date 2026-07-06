@@ -127,6 +127,14 @@ class ModerationCog(
 			logger.info(f"Moderation logging channel has been set to {self.log_channel.id}")
 		else:
 			logger.warning("Moderation logging channel could not be set!")
+	
+	@commands.Cog.listener()
+	async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+		if isinstance(error, app_commands.errors.MissingRole):
+			return await interaction.response.send_message(
+				"You don't have the required role to use this command.", ephemeral=True
+			)
+		raise error
 
 	@app_commands.command(name="log-here", description="Set the current log channel")
 	async def set_log_channel(self, interaction: discord.Interaction):
