@@ -198,6 +198,8 @@ class ReplyModal (discord.ui.Modal, title = "Reply to a Confession"):
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_role(MOD_ROLE_ID)
 class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moderation commands"):
+	def __init__(self, bot):
+		self.bot = bot
 
 	# DEFAULT ERROR HANDLER
 	@commands.Cog.listener()
