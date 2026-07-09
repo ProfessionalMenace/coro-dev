@@ -1,12 +1,9 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord.flags import Intents
 from discord import app_commands
 import typing
 import logging
-
-from corobot import confessions
-from corobot.meta import MetaCog
 from corobot.config import SERVER_ID, CURRENT_HOST
 
 logger = logging.getLogger(__name__)
@@ -31,7 +28,7 @@ class Corobot(commands.Bot):
 	async def setup_hook(self):
 		await self.load_extension("corobot.meta")
 		await self.load_extension("corobot.moderation")
-		self.tree.add_command(confessions.confessions_group)
+		await self.load_extension("corobot.confessions")
 
 		# sync
 		self.tree.copy_global_to(guild=guild)
@@ -44,12 +41,8 @@ class Corobot(commands.Bot):
 			if guild.id == SERVER_ID:
 				self.CoroboCult = guild
 
-		confessions.save_db.start()
-
 		# set status
-		activity = discord.CustomActivity(
-			"Currently Being Hosted By " + CURRENT_HOST
-		)
+		activity = discord.CustomActivity(f"Currently Being Hosted By {CURRENT_HOST}")
 		await self.change_presence(activity=activity, status=discord.Status.idle)
 
 def run_bot(TOKEN: typing.Optional[str]):
