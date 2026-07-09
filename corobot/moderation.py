@@ -105,7 +105,6 @@ class MessageLogDBManager:
 
 
 @app_commands.default_permissions(moderate_members=True)
-@app_commands.checks.has_role(MOD_ROLE_ID)
 class ModerationCog(
 	commands.GroupCog,
 	ModerationDBManager,
@@ -128,8 +127,11 @@ class ModerationCog(
 		else:
 			logger.warning("Moderation logging channel could not be set!")
 	
-	@commands.Cog.listener()
-	async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+	async def cog_app_command_error(
+    self,
+    interaction: discord.Interaction,
+    error: app_commands.AppCommandError
+  ):
 		if isinstance(error, app_commands.errors.MissingRole):
 			return await interaction.response.send_message(
 				"You don't have the required role to use this command.", ephemeral=True
@@ -137,6 +139,7 @@ class ModerationCog(
 		raise error
 
 	@app_commands.command(name="log-here", description="Set the current log channel")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def set_log_channel(self, interaction: discord.Interaction):
 		"""Set the current log channel"""
 		self.log_channel = interaction.channel
@@ -146,6 +149,7 @@ class ModerationCog(
 
 	@app_commands.command(name="warn", description="Send user a warning")
 	@app_commands.describe(target="Discord user", reason="Warning Message")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def warn(
 		self,
 		interaction: discord.Interaction,
@@ -211,9 +215,13 @@ class MessageLoggerCog(commands.Cog, MessageLogDBManager):
 		commands.Cog.__init__(self)
 		MessageLogDBManager.__init__(self, db_path)
 
-	@commands.Cog.listener()
-	async def on_ready(self):
-		self.prune_db.start()
+	async def cog_load(self):
+		if not self.prune_db.is_running():
+			self.prune_db.start()
+
+	async def cog_unload(self):
+		if self.prune_db.is_running():
+			self.prune_db.stop()
 
 	@tasks.loop(minutes=720)
 	async def prune_db(self):
