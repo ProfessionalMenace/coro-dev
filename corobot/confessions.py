@@ -196,30 +196,33 @@ class ReplyModal (discord.ui.Modal, title = "Reply to a Confession"):
 
 
 @app_commands.default_permissions(moderate_members=True)
-@app_commands.checks.has_role(MOD_ROLE_ID)
 class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moderation commands"):
 	def __init__(self, bot):
 		self.bot = bot
+		super().__init__()
 
 	# DEFAULT ERROR HANDLER
-	@commands.Cog.listener()
-	async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+	async def cog_app_command_error(
+		self,
+		interaction: discord.Interaction,
+		error: app_commands.AppCommandError
+	):
 		# INSUFFICIENT PERMISSION ROLE ERROR
 		if isinstance(error, app_commands.MissingRole):
-			return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
+			return await util.send_error_message(interaction, f"<@{MOD_ROLE_ID}> Permissions Needed", ephemeral=True)
 
 		# SQL RELATED ERROR
 		if isinstance(error, sql.MacroError):
 			return await error.send_error_message(interaction, ephemeral=True)
-		await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
 		
-		# rethrow
-		raise error
+		await util.send_error_message(interaction, f"Unexpected Failure! Please Report\n{error}", ephemeral=True)
+		logger.error(error)
 	
 	# CREATE & SAVE NEW SQL MACRO
 	@app_commands.command(name = "create-macro", description="Create a new macro")
 	@app_commands.describe(name = "Name of the macro", code = "Code of the macro")
-	async def add_macr (self, interaction: discord.Interaction, name: str, code: str):
+	@app_commands.checks.has_role(MOD_ROLE_ID)
+	async def add_macro (self, interaction: discord.Interaction, name: str, code: str):
 		await interaction.response.defer(ephemeral=True)
 		confessions_macro_manager.create_macro(
 			name = name,
@@ -231,6 +234,7 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 	# VIEW MACROS
 	@app_commands.command(name = "view-macro", description="View all macros, or get data on a specific one")
 	@app_commands.describe(name = "Get info on a specific macro")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def view_macros(self, interaction: discord.Interaction, name: typing.Optional[str] = None):
 		await interaction.response.defer()
 		output = ""
@@ -262,15 +266,10 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		return [app_commands.Choice(name = value["name"], value = value["name"])
 			for value in confessions_macro_manager.get_macros() if current in value["name"]][:25]
 
-	@view_macros.error
-	async def view_macros_error (self, interaction: discord.Interaction, error: Exception):
-		if isinstance(error, app_commands.CommandInvokeError) and isinstance(error.original, sql.MacroError):
-			return await error.original.send_error_message(interaction, ephemeral=True)
-		raise error
-
 	# EDIT MACROS
 	@app_commands.command(name = "edit-macro", description="Edit a macro you've created")
 	@app_commands.rename(new_name = "new-name", new_code = "new-code")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	@app_commands.describe(
 		name = "Current macro name",
 		new_name = "Rename the macro",
@@ -292,16 +291,10 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		return [app_commands.Choice(name = value["name"], value = value["name"])
 			for value in confessions_macro_manager.get_macros() if current in value["name"] and value["author_id"] == interaction.user.id][:25]
 
-	@edit_macro.error
-	async def edit_macro_error (self, interaction: discord.Interaction, error: Exception):
-		if isinstance(error, app_commands.CommandInvokeError) and isinstance(error.original, sql.MacroError):
-			return await error.original.send_error_message(interaction, ephemeral=True)
-		raise error
-
 	# DELETE MACRO
 	@app_commands.command(name = "delete-macro", description = "Delete a macro")
-	@app_commands.checks.has_role(MOD_ROLE_ID)
 	@app_commands.describe(name = "Unwanted macro name")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def delete_macro (self, interaction: discord.Interaction, name: str):
 		await interaction.response.defer(ephemeral=True)
 		confessions_macro_manager.delete_macro(name = name, editor = interaction.user.id)
@@ -312,14 +305,9 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		return [app_commands.Choice(name = value["name"], value = value["name"])
 			for value in confessions_macro_manager.get_macros() if current in value["name"] and value["author_id"] == interaction.user.id][:25]
 
-	@delete_macro.error
-	async def delete_macro_error (self, interaction: discord.Interaction, error: Exception):
-		if isinstance(error, app_commands.CommandInvokeError) and isinstance(error.original, sql.MacroError):
-			return await error.original.send_error_message(interaction, ephemeral=True)
-		raise error
-
 	# QUERY DATABASE 
 	@app_commands.command(name = "query", description="Query the database")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	@app_commands.describe(
 		query = "SQL query to request. input POP-OUT to get a paragraph input.",
 		select = "Whether or not this query is a select query",
@@ -347,6 +335,7 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		
 	# SAVE DATABASE 
 	@app_commands.command(name = "save", description = "Save the database")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def save_db (self, interaction: discord.Interaction):
 		confessions.save()
 		await interaction.response.send_message("Saved", ephemeral=True)
@@ -358,6 +347,7 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		select = "Whether or not this query is a select query",
 		size = "How many rows to return, only does something if select is True. Leave blank for all",
 	)
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def use_macro (self, interaction: discord.Interaction, macro: str, select: bool = False, size: int = -1):
 		data = confessions_macro_manager.get_macro(macro)
 
@@ -378,12 +368,6 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 					items_per_page = 25
 				)
 
-	@use_macro.error
-	async def use_macro_error (self, interaction: discord.Interaction, error: Exception):
-		if isinstance(error, app_commands.CommandInvokeError) and isinstance(error.original, sql.MacroError):
-			return await error.original.send_error_message(interaction, ephemeral=True)
-		raise error
-
 	@use_macro.autocomplete('macro')
 	async def use_macro_autocomplete(self, interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
 		return [app_commands.Choice(name = value["name"], value = value["name"])
@@ -392,6 +376,7 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 	# ADD CHANNEL
 	@app_commands.command(name = "add-channel", description = "Add a new channel to the confession channel list")
 	@app_commands.describe(channel = "The wanted channel")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def add_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
 		await interaction.response.defer(ephemeral = True)
 		VALID_CHANNELS[str(channel.id)] = {"id": channel.id}
@@ -402,6 +387,7 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 	# REMOVE CHANNEL
 	@app_commands.command(name = "remove-channel", description = "Remove a channel from the confession channel list")
 	@app_commands.describe(channel = "The unwanted channel")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
 	async def remove_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
 		await interaction.response.defer(ephemeral = True)
 		if str(channel.id) in VALID_CHANNELS:
@@ -412,16 +398,25 @@ class ConfessionsModCog(commands.GroupCog,	name="confessmod", description="Moder
 		else:
 			await interaction.followup.send(f"{channel.mention} not in vaild channel list")
 
-	@remove_channel.error
-	async def remove_channel_error (self, interaction: discord.Interaction, error: Exception):
-		if isinstance(error, app_commands.MissingRole):
-			return await util.send_error_message(interaction, f'<@{MOD_ROLE_ID}> Permissions Needed', ephemeral=True)
-		await util.send_error_message(interaction, "Unexpected Failure! Please Report\n" + str(error), ephemeral=True)
+	@app_commands.command(name = "view-channels", description = "View confession channel list")
+	@app_commands.checks.has_role(MOD_ROLE_ID)
+	async def view_channels (self, interaction: discord.Interaction):
+		await interaction.response.defer()
+		await interaction.followup.send("## Current Confessions Channel List\n" + "\n".join(f"<#{id}>" for id in VALID_CHANNELS))
 
 
 class ConfessionsUserCog(commands.GroupCog,	name="confessions", description="Anonymous Confession Commands"):
 	def __init__(self, bot):
 		self.bot = bot
+		super().__init__()
+
+	async def cog_load(self):
+		if not self.save_db.is_running():
+			self.save_db.start()
+
+	async def cog_unload(self):
+		if self.save_db.is_running():
+			self.save_db.stop()
 
 	@tasks.loop(minutes=5)
 	async def save_db(self):
@@ -447,11 +442,7 @@ class ConfessionsUserCog(commands.GroupCog,	name="confessions", description="Ano
 	@app_commands.describe(id = "Confession to reply to")
 	async def reply (self, interaction: discord.Interaction, id: int):
 		await interaction.response.send_modal(ReplyModal(id)) # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
-		
-	@app_commands.command(name = "view-channels", description = "View confession channel list")
-	async def view_channels (self, interaction: discord.Interaction):
-		await interaction.response.defer()
-		await interaction.followup.send("## Current Confessions Channel List\n" + "\n".join(f"<#{id}>" for id in VALID_CHANNELS))
+
 
 async def setup(bot):
 	await bot.add_cog(ConfessionsModCog(bot))
